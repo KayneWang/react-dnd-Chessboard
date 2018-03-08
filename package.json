@@ -18,9 +18,6 @@
     "webpack": "3",
     "webpack-dev-server": "2"
   },
-  "config": {
-    "port": 8003
-  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev-build": "webpack --config webpack.dev.config.js",
