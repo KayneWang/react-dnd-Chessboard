@@ -1,7 +1,7 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import Square from './Square'
-import { moveKnight, canMoveKnight } from './Game';
+import { moveKnight, canMoveKnight } from './Game'
 import { ItemTypes } from './Constants'
 import { DropTarget } from 'react-dnd'
 
