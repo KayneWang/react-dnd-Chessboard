@@ -382,7 +382,303 @@ export const ItemTypes = {
 }
 ```
 
-未完。。。
+DragSource高阶组件接受三个参数：type,spec,collect。本例中我们使用constants中定义的，所以我们现在需要开发drag source的规范和collecting方法。修改src/components/Knight.js，新增
+
+```js
+const knightSource = {
+  beginDrag(props) {
+    return {}
+  }
+}
+```
+
+因为我们这里没有需要描述的：在整个拖动应用中实际只有一个拖动对象。如果我们有很多棋子，我们就可以使用props参数来返回例如{pieceId: props.id}。在该例子中，空对象就可以满足条件了。
+
+接下来我们需要开发collecting方法，用于返回Knight所需要的属性。我们必须得确定拖动源节点，或者我们可以调整拖动过程中的透明度等等。所以，我们需要知道当前节点是否正在被拖动。
+
+修改src/components/Knight.js，新增
+
+```js
+function collect(connect, monitor) {
+  return {
+    connectDragSource: connect.dragSource(),
+    isDragging: monitor.isDragging()
+  }
+}
+```
+
+现在，我们整体看一下Knight组件
+
+```js
+import React from 'react'
+import PropTypes from 'prop-types'
+import { ItemTypes } from './Constants'
+import { DragSource } from 'react-dnd'
+
+const knightSource = {
+  beginDrag(props) {
+    return {}
+  }
+}
+
+function collect(connect, monitor) {
+  return {
+    connectDragSource: connect.dragSource(),
+    isDragging: monitor.isDragging()
+  }
+}
+
+class Knight extends React.Component {
+  render() {
+    const { connectDragSource, isDragging } = this.props
+    return connectDragSource(
+      <div style={{ opacity: isDragging ? 0.5 : 1, fontSize: 25, fontWeight: 'bold', cursor: 'move' }}>
+        ♘
+      </div>
+    )
+  }
+}
+
+Knight.propTypes = {
+  connectDragSource: PropTypes.func.isRequired,
+  isDragging: PropTypes.bool.isRequired
+}
+
+export default DragSource(ItemTypes.KNIGHT, knightSource, collect)(Knight)
+```
+
+![image](https://s3.amazonaws.com/f.cl.ly/items/3L1d0C203C0s1r1H2H0m/Screen%20Recording%202015-05-15%20at%2001.11%20pm.gif)
+
+现在Kinght已经是拖动源了，只是我们目前还没有放置目标。下面我们开始开发Square为放置目标。
+
+这次，我们需要进行组件拆分了，具体原因作者文档描述的很详细，我们直接进行拆分。
+
+在src/components中创建BoardSquare.js
+
+```js
+import React, { Component } from 'react'
+import PropTypes from 'prop-types'
+import Square from './Square'
+
+export default class BoardSquare extends Component {
+  render() {
+    const { x, y } = this.props
+    const black = (x + y) % 2 === 1
+
+    return (
+      <Square black={black}>
+        {this.props.children}
+      </Square>
+    )
+  }
+}
+
+BoardSquare.propTypes = {
+  x: PropTypes.number.isRequired,
+  y: PropTypes.number.isRequired
+}
+```
+
+修改src/components/Board.js
+
+```js
+renderSquare(i) {
+  const x = i % 8
+  const y = Math.floor(i / 8)
+  return (
+    <div key={i}
+         style={{ width: '12.5%', height: '12.5%' }}>
+      <BoardSquare x={x}
+                   y={y}>
+        {this.renderPiece(x, y)}
+      </BoardSquare>
+    </div>
+  )
+}
+
+renderPiece(x, y) {
+  const [knightX, knightY] = this.props.knightPosition
+  if (x === knightX && y === knightY) {
+    return <Knight />
+  }
+}
+```
+
+现在使用DropTarget封装BoardSquare，这里只写了一个放置目标规范的drop事件，修改src/components/BoardSquare.js，新增
+
+```js
+const squareTarget = {
+  drop(props, monitor) {
+    moveKnight(props.x, props.y)
+  }
+}
+```
+
+这里我们看到drop方法可以接受props，所以我们可以知道Knight是从那个位置移动过来的。在实际开发中，有可能会用到monitor.getItem()去检索从beginDrag返回的拖拽详情。
+
+在collecting方法中，我们将获取连接放置目标节点的功能，并且我们可以通过monitor知道鼠标是否在当前BoardSquare中，这样我们才可以突出显示
+
+```js
+function collect(connect, monitor) {
+  return {
+    connectDropTarget: connect.dropTarget(),
+    isOver: monitor.isOver()
+  }
+}
+```
+
+修改BoardSquare
+
+```js
+import React, { Component } from 'react';
+import PropTypes from 'prop-types';
+import Square from './Square';
+import { canMoveKnight, moveKnight } from './Game';
+import { ItemTypes } from './Constants';
+import { DropTarget } from 'react-dnd';
+
+const squareTarget = {
+  drop(props) {
+    moveKnight(props.x, props.y);
+  }
+};
+
+function collect(connect, monitor) {
+  return {
+    connectDropTarget: connect.dropTarget(),
+    isOver: monitor.isOver()
+  };
+}
+
+class BoardSquare extends Component {
+  render() {
+    const { x, y, connectDropTarget, isOver } = this.props;
+    const black = (x + y) % 2 === 1;
+
+    return connectDropTarget(
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%'
+      }}>
+        <Square black={black}>
+          {this.props.children}
+        </Square>
+        {isOver &&
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            height: '100%',
+            width: '100%',
+            zIndex: 1,
+            opacity: 0.5,
+            backgroundColor: 'yellow',
+          }} />
+        }
+      </div>
+    );
+  }
+}
+
+BoardSquare.propTypes = {
+  x: PropTypes.number.isRequired,
+  y: PropTypes.number.isRequired,
+  connectDropTarget: PropTypes.func.isRequired,
+  isOver: PropTypes.bool.isRequired
+};
+
+export default DropTarget(ItemTypes.KNIGHT, squareTarget, collect)(BoardSquare);
+```
+
+![image](https://s3.amazonaws.com/f.cl.ly/items/2U43301g421U3I2X2p0P/Screen%20Recording%202015-05-15%20at%2001.55%20pm.gif)
+
+修改src/components/BoardSquare.js中的squareTarget对象，新增canDrop
+
+```js
+const squareTarget = {
+  canDrop(props) {
+    return canMoveKnight(props.x, props.y)
+  },
+
+  drop(props, monitor) {
+    moveKnight(props.x, props.y)
+  }
+}
+```
+
+我们还需要在collecting方法中添加monitor.canDrop()，并且添加一些代码渲染效果
+
+```js
+import React from 'react'
+import PropTypes from 'prop-types'
+import Square from './Square'
+import { moveKnight, canMoveKnight } from './Game'
+import { ItemTypes } from './Constants'
+import { DropTarget } from 'react-dnd'
+
+const squareTarget = {
+  canDrop(props) {
+    return canMoveKnight(props.x, props.y)
+  },
+
+  drop(props, monitor) {
+    moveKnight(props.x, props.y)
+  }
+}
+
+function collect(connect, monitor) {
+  return {
+    connectDropTarget: connect.dropTarget(),
+    isOver: monitor.isOver(),
+    canDrop: monitor.canDrop()
+  }
+}
+
+class BoardSquare extends React.Component {
+  renderOverlay(color) {
+    return (
+      <div
+        style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: '100%', zIndex: 1, opacity: 0.5, backgroundColor: color }}
+      />
+    )
+  }
+  render() {
+    const { x, y, connectDropTarget, isOver, canDrop } = this.props
+    const black = (x + y) % 2 === 1
+    return (
+      connectDropTarget(
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <Square black={black}>
+            {this.props.children}
+          </Square>
+          {isOver && !canDrop && this.renderOverlay('red')}
+          {!isOver && canDrop && this.renderOverlay('yellow')}
+          {isOver && canDrop && this.renderOverlay('green')}
+        </div>
+      )
+    )
+  }
+}
+
+BoardSquare.propTypes = {
+  x: PropTypes.number.isRequired,
+  y: PropTypes.number.isRequired,
+  connectDropTarget: PropTypes.func.isRequired,
+  isOver: PropTypes.bool.isRequired,
+  canDrop: PropTypes.bool.isRequired
+}
+
+export default DropTarget(ItemTypes.KNIGHT, squareTarget, collect)(BoardSquare)
+```
+
+![image](https://s3.amazonaws.com/f.cl.ly/items/0X3c342g0i3u100p1o18/Screen%20Recording%202015-05-15%20at%2002.05%20pm.gif)
+
+这样，我们的拖拽例子已经完成了
+
+## 最后触发优化
+
+可以参考[原文档](http://react-dnd.github.io/react-dnd/docs-tutorial.html)进行修改。
 
 
 <br />
