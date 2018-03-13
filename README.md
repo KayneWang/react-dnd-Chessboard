@@ -226,6 +226,163 @@ ReactDom.render(
 
 ![image](http://i.imgur.com/0fNBn5a.png)
 
-未完待续。。。
+## 添加状态
+
+文档作者在这里提到希望通过通过一个文件来控制KnightPosition，实际开发中的做法是使用Flux、Redux等，这里我们根据作者文档实现一个Game来改变我们的KnightPosition，首先改写src/index.js
+
+```js
+import React from 'react'
+import ReactDom from 'react-dom'
+import Board from './components/Board'
+import { observe } from './components/Game'
+
+const rootEl = document.getElementById('app')
+
+observe(knightPosition => ReactDom.render(<Board knightPosition={knightPosition} />, rootEl))
+```
+
+接下来我们先实现一个初始版的Game，在src/components中创建Game.js文件
+
+```js
+export function observe(receive) {
+    setInterval(() => receive([
+        Math.floor(Math.random() * 8),
+        Math.floor(Math.random() * 8)
+    ]), 500)
+}
+```
+
+现在我们可以看到
+
+![image](https://s3.amazonaws.com/f.cl.ly/items/1K0s0n0r0C0e2P2N2D1d/Screen%20Recording%202015-05-15%20at%2012.06%20pm.gif)
+
+修改src/components/Game.js
+
+```js
+let knightPosition = [0, 0]
+let observer = null
+
+function emitChange() {
+    observer(knightPosition)
+}
+
+export function observe(o) {
+    if (observer) {
+        throw new Error('Multiple observers not implemented.')
+    }
+    observer = o
+    emitChange()
+}
+
+export function moveKnight(toX, toY) {
+    knightPosition = [toX, toY]
+    emitChange()
+}
+```
+
+现在，我们回到组件中，我们的目标是通过点击方块来移动Knight。作者这里提到了为什么使用Board来控制位置的原因（大概意思就是Square不需要确定自己的位置来渲染），修改src/components/Board.js，增加代码
+
+```js
+import React from 'react'
+import PropTypes from 'prop-types'
+import Square from './Square'
+import Knight from './Knight'
+import { moveKnight } from './Game'
+
+/* 其它代码 */
+
+renderSquare(i) {
+  const x = i % 8
+  const y = Math.floor(i / 8)
+  const black = (x + y) % 2 === 1
+
+  const [knightX, knightY] = this.props.knightPosition
+  const piece = (x === knightX && y === knightY) ?
+    <Knight /> :
+    null
+
+  return (
+    <div key={i}
+         style={{ width: '12.5%', height: '12.5%' }}
+         onClick={() => this.handleSquareClick(x, y)}>
+      <Square black={black}>
+        {piece}
+      </Square>
+    </div>
+  );
+}
+
+handleSquareClick(toX, toY) {
+  moveKnight(toX, toY)
+}
+```
+
+接下来我们需要定义一个移动规则，在src/components/Game.js中新增
+
+```js
+let knightPosition = [1, 7]
+
+/* 其它代码 */
+
+export function canMoveKnight(toX, toY) {
+  const [x, y] = knightPosition;
+  const dx = toX - x
+  const dy = toY - y
+
+  return (Math.abs(dx) === 2 && Math.abs(dy) === 1) ||
+         (Math.abs(dx) === 1 && Math.abs(dy) === 2)
+}
+```
+
+最后，修改src/components/Board.js
+
+```js
+import { canMoveKnight, moveKnight } from './Game'
+
+/* 其它代码 */
+
+handleSquareClick(toX, toY) {
+  if (canMoveKnight(toX, toY)) {
+    moveKnight(toX, toY)
+  }
+}
+```
+
+![image](https://s3.amazonaws.com/f.cl.ly/items/1F371u301l1H2X3o0g1h/Screen%20Recording%202015-05-15%20at%2012.08%20pm.gif)
+
+## 添加拖拽交互
+
+下面我们将看到如何使用React DnD来实现组件的拖拽功能
+
+```shell
+$ npm install --save react-dnd react-dnd-html5-backend
+```
+
+首先我们要设置DragDropContext，并且指定在应用中使用HTML5 backend
+
+修改src/components/Board.js
+
+```js
+import React, { Component } from 'react'
+import { DragDropContext } from 'react-dnd'
+import HTML5Backend from 'react-dnd-html5-backend'
+
+class Board extends Component {
+  /* 其它代码 */
+}
+
+export default DragDropContext(HTML5Backend)(Board)
+```
+
+然后，在src/components创建constants.js
+
+```js
+export const ItemTypes = {
+  KNIGHT: 'knight'
+}
+```
+
+未完。。。
+
 
 <br />
