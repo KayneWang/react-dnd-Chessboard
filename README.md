@@ -1,3 +1,11 @@
+## 本地开发
+
+```shell
+$ git clone https://github.com/wangzengkai/react-dnd-Chessboard.git
+$ npm install
+$ npm start
+```
+
 ## react-dnd棋盘实现
 方便快速理解react-dnd，官方提供了Chessboard例子，本项目是对官方例子的具体实现，为了方便初学者快速入手接下来笔者将会使用一些通俗易懂的表达方式一步一步完成此例子的开发。当然，您也可以访问[react-dnd文档](http://react-dnd.github.io/react-dnd/docs-tutorial.html)进行开发。
 <br />
